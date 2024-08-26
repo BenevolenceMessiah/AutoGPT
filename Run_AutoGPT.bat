@@ -70,8 +70,8 @@ echo Please choose from the following options:
 echo Note: These options are all case sensitive.
 echo Press Ctrl+c to exit at any time!
 echo ---------------------------------------------------------------
-echo 1 Install AutoGPT
-echo 2 Run AutoGPT
+echo 1) Install AutoGPT
+echo 2) Run AutoGPT
 echo C) Exit
 echo U) Update repo.
 echo ---------------------------------------------------------------
