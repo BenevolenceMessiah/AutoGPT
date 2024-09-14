@@ -23,10 +23,12 @@ from autogpt_server.util import json, mock
 class GraphExecution(BaseModel):
     graph_exec_id: str
     start_node_execs: list["NodeExecution"]
+    graph_id: str
 
 
 class NodeExecution(BaseModel):
     graph_exec_id: str
+    graph_id: str
     node_exec_id: str
     node_id: str
     data: BlockInput
@@ -257,8 +259,25 @@ async def upsert_execution_output(
     )
 
 
+async def update_graph_execution_stats(graph_exec_id: str, stats: dict[str, Any]):
+    await AgentGraphExecution.prisma().update(
+        where={"id": graph_exec_id},
+        data={"stats": json.dumps(stats)},
+    )
+
+
+async def update_node_execution_stats(node_exec_id: str, stats: dict[str, Any]):
+    await AgentNodeExecution.prisma().update(
+        where={"id": node_exec_id},
+        data={"stats": json.dumps(stats)},
+    )
+
+
 async def update_execution_status(
-    node_exec_id: str, status: ExecutionStatus, execution_data: BlockInput | None = None
+    node_exec_id: str,
+    status: ExecutionStatus,
+    execution_data: BlockInput | None = None,
+    stats: dict[str, Any] | None = None,
 ) -> ExecutionResult:
     if status == ExecutionStatus.QUEUED and execution_data is None:
         raise ValueError("Execution data must be provided when queuing an execution.")
@@ -271,6 +290,7 @@ async def update_execution_status(
         **({"endedTime": now} if status == ExecutionStatus.FAILED else {}),
         **({"endedTime": now} if status == ExecutionStatus.COMPLETED else {}),
         **({"executionData": json.dumps(execution_data)} if execution_data else {}),
+        **({"stats": json.dumps(stats)} if stats else {}),
     }
 
     res = await AgentNodeExecution.prisma().update(
@@ -282,6 +302,26 @@ async def update_execution_status(
         raise ValueError(f"Execution {node_exec_id} not found.")
 
     return ExecutionResult.from_db(res)
+
+
+async def get_graph_execution(
+    graph_exec_id: str, user_id: str
+) -> AgentGraphExecution | None:
+    """
+    Retrieve a specific graph execution by its ID.
+
+    Args:
+        graph_exec_id (str): The ID of the graph execution to retrieve.
+        user_id (str): The ID of the user to whom the graph (execution) belongs.
+
+    Returns:
+        AgentGraphExecution | None: The graph execution if found, None otherwise.
+    """
+    execution = await AgentGraphExecution.prisma().find_first(
+        where={"id": graph_exec_id, "userId": user_id},
+        include=GRAPH_EXECUTION_INCLUDE,
+    )
+    return execution
 
 
 async def list_executions(graph_id: str, graph_version: int | None = None) -> list[str]:
